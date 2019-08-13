@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  db:
+    container_name: ${DOCKER_PROJECT_NAME}-db
+    build:
+      context: .deploy/local/docker
+      dockerfile: db.Dockerfile
+      args:
+        VERSION: ${DOCKER_DB_VERSION}
+    environment:
+      MYSQL_DATABASE: ${DOCKER_DB_NAME}
+      MYSQL_USER: ${DOCKER_DB_USER}
+      MYSQL_PASSWORD: ${DOCKER_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD}
+      TZ: ${TIMEZONE}
+    ports:
+      - ${DOCKER_DB_PORT}:3306
+    volumes:
+      - db-data:/var/lib/mysql
+
+  app:
+    container_name: ${DOCKER_PROJECT_NAME}-app
+    build:
+      context: .
+      dockerfile: .deploy/local/docker/app.Dockerfile
+      args:
+        DOCKER_PROJECT_DIR: ${DOCKER_PROJECT_DIR}
+        TIMEZONE: ${TIMEZONE}
+        VERSION: ${DOCKER_PHP_FPM_VERSION}
+        COMPOSER_VERSION: ${DOCKER_COMPOSER_VERSION}
+    environment:
+        XDEBUG_CONFIG: "idekey=${DOCKER_XDEBUG_IDEKEY}"
+        PHP_IDE_CONFIG: "serverName=_"
+        XDEBUG_REMOTE_HOST: ${DOCKER_XDEBUG_REMOTE_HOST}
+        XDEBUG_REMOTE_PORT: ${DOCKER_XDEBUG_REMOTE_PORT}
+        XDEBUG_IDEKEY: ${DOCKER_XDEBUG_IDEKEY}
+
+  http:
+    container_name: ${DOCKER_PROJECT_NAME}-http
+    build:
+      context: .deploy/local/docker
+      dockerfile: http.Dockerfile
+      args:
+        TIMEZONE: ${TIMEZONE}
+        VERSION: ${DOCKER_NGINX_VERSION}
+        UPSTREAM: ${DOCKER_PROJECT_NAME}-app
+    ports:
+      - ${DOCKER_NGINX_PORT}:80
+    volumes:
+      - ./:${DOCKER_PROJECT_DIR}:ro
+      - ./.deploy/local/docker/etc/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+volumes:
+  db-data:
